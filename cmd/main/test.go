@@ -1,11 +1,11 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"io"
-	"log"
 	"os"
+	"time"
+	"yd_backup/internal/repo/yandex"
+	"yd_backup/internal/repo/yandex/models"
 )
 
 type CheckReader struct {
@@ -20,20 +20,22 @@ func (c *CheckReader) Read(p []byte) (n int, err error) {
 }
 
 func main() {
-
-	file, _ := os.Open("D:\\Workplace\\main.fxml")
-
-	reader := &CheckReader{
-		file: file,
+	b := yandex.BackupYandex{
+		Token:   "y0_AgAAAAAi4OVKAAo8SwAAAADoq7JNqpCSv53NSM6F9-pToFzBLznjR00",
+		Timeout: time.Second * 10,
 	}
 
-	wr := &bufio.Writer{}
+	params := models.Params{
+		Path:      "backup.txt",
+		Overwrite: true,
+		Fields:    nil,
+	}
 
-	n, err := io.Copy(wr, reader)
+	response, err := b.CreateLink(params)
 
 	if err != nil {
-		log.Println(err)
+		panic(err)
 	}
 
-	fmt.Println(n)
+	fmt.Println(response)
 }
