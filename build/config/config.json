@@ -1,0 +1,23 @@
+{
+  "verbose": true,
+
+  "databases": {
+    "paths": [
+      "G:\\Downloads\\The_Road_to_56.zip",
+      "G:\\Downloads\\SSL_3_1_9_238_setup1c.zip",
+      "D:\\Workplace\\main.fxml"
+    ]
+  },
+
+  "backup": {
+    "dir" : "./backup",
+    "count": 5,
+    "expired": "72h"
+  },
+
+  "yandex": {
+    "timeout": "2h",
+    "token": "y0_AgAAAAAi4OVKAAo8SwAAAADoq7JNqpCSv53NSM6F9-pToFzBLznjR00",
+    "dir": "backup"
+  }
+}
