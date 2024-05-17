@@ -1,9 +1,14 @@
 package yandex
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"github.com/valyala/fasthttp"
+	"io"
+	"mime/multipart"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -104,6 +109,64 @@ func (y *BackupYandex) CreateLink(params models.Params) (models.Link, error) {
 }
 
 func (y *BackupYandex) UploadFile(link string, path string) error {
+	request := fasthttp.AcquireRequest()
+	defer fasthttp.ReleaseRequest(request)
+	response := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseResponse(response)
+
+	request.SetRequestURI(link)
+	request.Header.SetMethod(fasthttp.MethodPut)
+
+	bufferedReader := bufio.NewReader(file)
+
+	bodyReader, bodyWriter := io.Pipe()
+
+	multipartWriter := multipart.NewWriter(bodyWriter)
+
+	defer multipartWriter.Close()
+
+	go func() {
+		file, err := os.Open(path)
+
+		if err != nil {
+			return
+		}
+
+		defer file.Close()
+
+		part, err := multipartWriter.CreateFormFile("file", filepath.Base(path))
+
+		if err != nil {
+			return
+		}
+
+		io.Copy(part, bufferedReader)
+	}()
+
+	request.Header.SetContentType(multipartWriter.FormDataContentType())
+	request.Header.Set("Authorization", "OAuth "+y.Token)
+
+	request.SetBodyStream(bodyReader, -1)
+
+	defer request.CloseBodyStream()
+
+	err = y.client.DoTimeout(request, response, y.Timeout)
+
+	if err != nil {
+		return err
+	}
+
+	if response.StatusCode() != fasthttp.StatusOK {
+		var err *models.ResponseError
+		errMarshaller := json.Unmarshal(response.Body(), &err)
+
+		if errMarshaller != nil {
+			return errMarshaller
+		}
+
+		return err
+	}
+
 	return nil
 }
 

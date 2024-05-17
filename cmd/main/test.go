@@ -38,4 +38,11 @@ func main() {
 	}
 
 	fmt.Println(response)
+
+	err = b.UploadFile(response.Href, "./backup.txt")
+
+	if err != nil {
+		panic(err)
+	}
+
 }
