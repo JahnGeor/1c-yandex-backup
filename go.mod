@@ -11,6 +11,7 @@ require (
 	github.com/google/logger v1.1.1 // indirect
 	github.com/klauspost/compress v1.17.8 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
+	github.com/studio-b12/gowebdav v0.9.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.53.0 // indirect
 	golang.org/x/crypto v0.21.0 // indirect

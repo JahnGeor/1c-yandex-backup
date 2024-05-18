@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"fmt"
 	"github.com/google/logger"
 	"sync"
 	"yd_backup/internal/models"
@@ -13,6 +14,7 @@ type LocalBackup interface {
 
 type RemoteBackup interface {
 	UploadBackup(path string) error
+	RemoveBackup(path string) error
 }
 
 type Result struct {
@@ -32,13 +34,18 @@ func (r *Result) setSuccess() {
 	r.success++
 }
 
-func (r *Result) Backup(path string) error {
-
+type BackupService struct {
+	paths  []string
+	remote RemoteBackup
+	local  LocalBackup
 }
 
-type BackupService struct {
-	setting models.Settings
-	remote  Backup
+func NewBackupService(setting models.Settings, remote RemoteBackup, local LocalBackup) *BackupService {
+	return &BackupService{
+		paths:  setting.Databases.Paths,
+		remote: remote,
+		local:  local,
+	}
 }
 
 func (b *BackupService) BackupAll() {
@@ -48,7 +55,7 @@ func (b *BackupService) BackupAll() {
 		success: 0,
 	}
 
-	for _, path := range b.setting.Databases.Paths {
+	for _, path := range b.paths {
 		wg.Add(1)
 
 		currentPath := path
@@ -67,9 +74,29 @@ func (b *BackupService) BackupAll() {
 
 	wg.Wait()
 
-	logger.Info("Backup success: %d/%d", result.getSuccess(), len(b.setting.Databases.Paths))
+	logger.Info("Backup success: %d/%d", result.getSuccess(), len(b.paths))
 }
 
 func (b *BackupService) Backup(path string) error {
-	return b.remote.Backup(path)
+	//TODO: Создать локальную копию
+	backupPath, err := b.local.CreateBackup(path)
+	if err != nil {
+		return fmt.Errorf("unable to create local backup: %v", err)
+	}
+	//TODO: Создать удаленную копию
+
+	err = b.remote.UploadBackup(backupPath)
+
+	if err != nil {
+		return fmt.Errorf("unable to upload backup to remote disk: %v", err)
+	}
+
+	return nil
+}
+
+func (b *BackupService) EraseBackups() error {
+	//TODO: Удалить бэкапы локально
+	//TODO: Удалить бэкапы на удаленном сервере
+
+	return nil
 }

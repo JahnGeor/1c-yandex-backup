@@ -1,18 +1,16 @@
-package yandex
+package disk
 
 import (
-	"bufio"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"github.com/valyala/fasthttp"
-	"io"
-	"mime/multipart"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
-	"yd_backup/internal/repo/yandex/models"
+	"yd_backup/internal/repo"
+	"yd_backup/pkg/yandex/disk/models"
 )
 
 const yandexDiskURL = "https://cloud-api.yandex.net"
@@ -21,32 +19,42 @@ const (
 	uploadURL = "v1/disk/resources/upload"
 )
 
-type BackupYandex struct {
-	client    fasthttp.Client
-	Token     string
-	expired   time.Duration
-	retention int
-	Timeout   time.Duration
+type YandexDisk struct {
+	client  *fasthttp.Client
+	Token   string
+	Timeout time.Duration
 }
 
-func (y *BackupYandex) GetToken() string {
+func (y *YandexDisk) GetToken() string {
 	return y.Token
 }
 
-func (y *BackupYandex) SetToken(token string) {
+func (y *YandexDisk) SetToken(token string) {
 	y.Token = token
 }
 
-func NewBackupYandex(token string, expired time.Duration, retention int) *BackupYandex {
-	return &BackupYandex{
-		Token:     token,
-		client:    fasthttp.Client{},
-		expired:   expired,
-		retention: retention,
+func NewBackupYandex(token string, timeout time.Duration) *YandexDisk {
+	client := &fasthttp.Client{
+		TLSConfig: &tls.Config{
+			InsecureSkipVerify: true,
+			MinVersion:         tls.VersionTLS10,
+		},
+		MaxConnsPerHost:           2000,
+		MaxIdleConnDuration:       100 * time.Second,
+		MaxConnDuration:           150 * time.Second,
+		ReadTimeout:               timeout,
+		WriteTimeout:              timeout,
+		MaxConnWaitTimeout:        50 * time.Second,
+		MaxIdemponentCallAttempts: 5,
+	}
+
+	return &YandexDisk{
+		Token:  token,
+		client: client,
 	}
 }
 
-func (y *BackupYandex) CreateResource(resourcePath string) error {
+func (y *YandexDisk) CreateResource(resourcePath string) error {
 	return nil
 }
 
@@ -55,7 +63,7 @@ func (y *BackupYandex) CreateResource(resourcePath string) error {
 // & [overwrite=<признак перезаписи>]
 // & [fields=<свойства, которые нужно включить в ответ>]
 // Valid status codes: 200 OK
-func (y *BackupYandex) CreateLink(params models.Params) (models.Link, error) {
+func (y *YandexDisk) CreateLink(params models.Params) (models.Link, error) {
 	var link models.Link
 
 	request := fasthttp.AcquireRequest()
@@ -80,7 +88,7 @@ func (y *BackupYandex) CreateLink(params models.Params) (models.Link, error) {
 	request.URI().QueryArgs().Add("path", params.Path)
 	request.URI().QueryArgs().Add("overwrite", strconv.FormatBool(params.Overwrite))
 
-	err := y.client.DoTimeout(request, response, y.Timeout)
+	err := y.client.Do(request, response)
 
 	if err != nil {
 		return link, err
@@ -108,68 +116,52 @@ func (y *BackupYandex) CreateLink(params models.Params) (models.Link, error) {
 	return link, nil
 }
 
-func (y *BackupYandex) UploadFile(link string, path string) error {
+func (y *YandexDisk) UploadFile(link models.Link, path string) error {
+
 	request := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(request)
 	response := fasthttp.AcquireResponse()
 	defer fasthttp.ReleaseResponse(response)
 
-	request.SetRequestURI(link)
-	request.Header.SetMethod(fasthttp.MethodPut)
+	request.Header.Set("Authorization", fmt.Sprintf("OAuth %s", y.Token))
 
-	bufferedReader := bufio.NewReader(file)
+	request.SetRequestURI(link.Href)
+	request.Header.SetMethod(link.Method)
+	request.Header.SetMethod(link.Method)
+	request.SetRequestURI(link.Href)
 
-	bodyReader, bodyWriter := io.Pipe()
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
 
-	multipartWriter := multipart.NewWriter(bodyWriter)
+	piper, err := repo.NewWithFile(file)
 
-	defer multipartWriter.Close()
+	if err != nil {
+		return err
+	}
 
-	go func() {
-		file, err := os.Open(path)
+	request.SetBodyStream(piper, -1)
 
-		if err != nil {
-			return
-		}
+	client := fasthttp.Client{
+		ReadTimeout:  y.Timeout,
+		WriteTimeout: y.Timeout,
+	}
 
-		defer file.Close()
-
-		part, err := multipartWriter.CreateFormFile("file", filepath.Base(path))
-
-		if err != nil {
-			return
-		}
-
-		io.Copy(part, bufferedReader)
-	}()
-
-	request.Header.SetContentType(multipartWriter.FormDataContentType())
-	request.Header.Set("Authorization", "OAuth "+y.Token)
-
-	request.SetBodyStream(bodyReader, -1)
-
-	defer request.CloseBodyStream()
-
-	err = y.client.DoTimeout(request, response, y.Timeout)
+	err = client.Do(request, response)
 
 	if err != nil {
 		return err
 	}
 
 	if response.StatusCode() != fasthttp.StatusOK {
-		var err *models.ResponseError
-		errMarshaller := json.Unmarshal(response.Body(), &err)
-
-		if errMarshaller != nil {
-			return errMarshaller
-		}
-
-		return err
+		fmt.Println(response.StatusCode())
 	}
 
 	return nil
 }
 
-func (y *BackupYandex) RemoveFile() error {
+func (y *YandexDisk) RemoveFile() error {
 	return nil
 }
