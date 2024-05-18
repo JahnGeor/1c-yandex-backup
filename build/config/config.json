@@ -4,25 +4,25 @@
   "yandex": {
     "timeout": "2h",
     "token": "y0_AgAAAAAi4OVKAAo8SwAAAADoq7JNqpCSv53NSM6F9-pToFzBLznjR00",
-    "dir": "backup"
+    "dir": "backup",
+    "extension": false
   },
 
-  "files": {
-    "paths": [
+  "files": [
       {
-        "path": "G:\\Downloads\\The_Road_to_56.zip",
-        "name": "Road"
+        "path": "G:\\Downloads\\Браузерные загрузки\\YandexDisk30Setup.exe",
+        "name": "Yandex_Setup"
       },
-      {
-        "path": "G:\\Downloads\\Windows11.iso",
-        "name": "Windows"
-      }
-    ]
-  },
+    {
+      "path": "G:\\Downloads\\Браузерные загрузки\\DiskUploader-1.0-jar-with-dependencies.jar",
+      "name": "DiskUploader"
+    }
+    ],
+
 
   "backup": {
     "dir" : "./backup",
     "count": 5,
-    "expired": "72h"
+    "expired": "5s"
   }
 }

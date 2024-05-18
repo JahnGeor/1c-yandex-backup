@@ -6,20 +6,23 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+	entity "yd_backup/internal/models"
 )
 
 type BackupLocal struct {
-	BackupDir string
-	Retention int
-	Expired   time.Duration
+	setting entity.Setting
 }
 
-func (b *BackupLocal) CreateBackup(path string) (string, error) {
+func NewBackupLocal(setting entity.Setting) *BackupLocal {
+	return &BackupLocal{setting: setting}
+}
 
-	file, err := os.OpenFile(path, os.O_RDONLY, 0666)
+func (b *BackupLocal) CreateBackup(path entity.Files) (string, error) {
+
+	file, err := os.OpenFile(path.Path, os.O_RDONLY, 0666)
 
 	if err != nil {
-		return "", fmt.Errorf("unable to open source file %s", path)
+		return "", fmt.Errorf("unable to open source file %s", path.Path)
 	}
 
 	defer file.Close()
@@ -27,16 +30,16 @@ func (b *BackupLocal) CreateBackup(path string) (string, error) {
 	fileInfo, err := file.Stat()
 
 	if err != nil {
-		return "", fmt.Errorf("unable to stat source file %s", path)
+		return "", fmt.Errorf("unable to stat source file %s", path.Path)
 	}
 
 	if fileInfo.Size() == 0 {
-		return "", fmt.Errorf("source file %s is empty", path)
+		return "", fmt.Errorf("source file %s is empty", path.Path)
 	}
 
-	backupFileName := fmt.Sprintf("%s.%s", time.Now().Format("20060102150405"), filepath.Base(fileInfo.Name()))
+	backupFileName := fmt.Sprintf("%s_%s_%s", path.Name, time.Now().Format("20060102150405"), filepath.Base(fileInfo.Name()))
 
-	backupFilePath := filepath.Join(b.BackupDir, backupFileName)
+	backupFilePath := filepath.Join(b.setting.Backup.Dir, backupFileName)
 
 	backupFile, err := os.OpenFile(backupFilePath, os.O_WRONLY|os.O_CREATE, 0666)
 
@@ -52,22 +55,23 @@ func (b *BackupLocal) CreateBackup(path string) (string, error) {
 		return "", fmt.Errorf("unable to copy source file %s to backup file %s", path, backupFilePath)
 	}
 
-	return backupFileName, nil
+	return backupFile.Name(), nil
 }
 
-func (b *BackupLocal) EraseBackups() error {
-	if b.Retention == 0 {
-		return fmt.Errorf("retention is not set")
+func (b *BackupLocal) EraseBackup() ([]string, error) {
+	var deletedFiles []string
+	if b.setting.Backup.Retention == 0 {
+		return nil, fmt.Errorf("retention is not set")
 	}
 
-	if b.Expired == 0 {
-		return fmt.Errorf("expired is not set")
+	if b.setting.Backup.Expired.Duration == 0 {
+		return nil, fmt.Errorf("expired is not set")
 	}
 
-	files, err := os.ReadDir(b.BackupDir)
+	files, err := os.ReadDir(b.setting.Backup.Dir)
 
 	if err != nil {
-		return fmt.Errorf("unable to read backup directory %s", b.BackupDir)
+		return nil, fmt.Errorf("unable to read backup directory %s", b.setting.Backup.Dir)
 	}
 
 	for _, file := range files {
@@ -77,16 +81,17 @@ func (b *BackupLocal) EraseBackups() error {
 
 		fileInfo, err := file.Info()
 		if err != nil {
-			return fmt.Errorf("unable to get file info %s", file.Name())
+			return nil, fmt.Errorf("unable to get file info %s", file.Name())
 		}
 
-		if fileInfo.ModTime().Add(b.Expired).Before(time.Now()) {
-			err = os.Remove(filepath.Join(b.BackupDir, file.Name()))
+		if fileInfo.ModTime().Add(b.setting.Backup.Expired.Duration).Before(time.Now()) {
+			err = os.Remove(filepath.Join(b.setting.Backup.Dir, file.Name()))
 			if err != nil {
-				return fmt.Errorf("unable to remove file %s", file.Name())
+				return nil, fmt.Errorf("unable to remove file %s", file.Name())
 			}
+			deletedFiles = append(deletedFiles, file.Name())
 		}
 	}
 
-	return nil
+	return deletedFiles, nil
 }

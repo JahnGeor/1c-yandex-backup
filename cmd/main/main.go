@@ -24,7 +24,7 @@ func main() {
 		runtime.Goexit()
 	}
 
-	var setting models.Settings
+	var setting models.Setting
 
 	if err := json.
 		NewDecoder(settingFile).Decode(&setting); err != nil {
@@ -59,7 +59,7 @@ func main() {
 	repo.BackupAll(setting)
 
 	//
-	//size, path, err := makeBackup(setting.Databases.Paths, setting.Backup.Dir)
+	//size, path, err := makeBackup(setting.Databases.Files, setting.Backup.Dir)
 	//if err != nil {
 	//	logger.Errorf("[ЭТАП 1] Ошибка при выполнении операции бэкапирования: %s", err.Error())
 	//	runtime.Goexit()
