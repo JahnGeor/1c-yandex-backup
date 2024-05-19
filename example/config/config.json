@@ -3,7 +3,7 @@
 
   "yandex": {
     "timeout": "2h",
-    "token": "y0_AgAAAAAi4OVKAAo8SwAAAADoq7JNqpCSv53NSM6F9-pToFzBLznjR00",
+    "token": "",
     "dir": "backup",
     "extension": false
   },
